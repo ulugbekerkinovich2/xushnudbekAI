@@ -37,7 +37,9 @@ VECTOR_STORE_ID = config.get("vector_store_id")
 # So‘rov uchun pydantic model
 class Query(BaseModel):
     question: str
-
+@app.get("/")
+def home():
+    return {"message": "server is running"}
 # Matnni embeddingga aylantirish
 def get_embedding(text: str) -> list:
     response = client.embeddings.create(
