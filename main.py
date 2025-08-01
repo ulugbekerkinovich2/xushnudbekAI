@@ -119,6 +119,18 @@ def find_best_matching_line(lines: list, embeddings: list, query: str, top_k: in
 #     top_lines = [lines[i] for i in top_indices]
 #     top_scores = [similarities[i] for i in top_indices]
 #     return list(zip(top_lines, top_scores))
+import re
+
+def extract_links_from_answer(answer: str):
+    """Answer ichidan [text](link) formatidagi havolalarni ajratib oladi."""
+    link_pattern = r'\[([^\]]+)\]\((https?://[^\)]+)\)'
+    matches = re.findall(link_pattern, answer)
+    
+    links = [{"title": title, "url": url} for title, url in matches]
+    # Clean answer text (remove markdown links)
+    cleaned_answer = re.sub(link_pattern, r'\1', answer)
+
+    return cleaned_answer.strip(), links
 
 @limiter.limit("5/minute")
 @app.post("/ask")
@@ -142,15 +154,20 @@ def ask_question(query: Query, request: Request):
         assistant_id=ASSISTANT_ID
     )
     messages = client.beta.threads.messages.list(thread_id=thread.id)
-    answer = messages.data[0].content[0].text.value
+    raw_answer = messages.data[0].content[0].text.value.strip()
 
+    # [title](url) formatdagi linklarni ajratib olish
+    cleaned_answer, links = extract_links_from_answer(raw_answer)
 
     formatted_sources = "\n\n".join(
         [f"{i+1}. {line.strip()} (score: {score:.3f})" for i, (line, score) in enumerate(top_matches)]
     )
 
     return {
-        "answer": answer,
+        "answer": {
+            "text": cleaned_answer,
+            "links": links
+        },
         "source": formatted_sources
     }
 
